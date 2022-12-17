@@ -107,9 +107,9 @@ acme_ssl(){
 }
 
 install_v2ray(){    
-    bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh) --version v4.45.2
+    # bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
     
-cat >/usr/local/etc/v2ray/config.json<<EOF
+cat >/usr/local/etc/xray/config.json<<EOF
 {
   "inbounds": [
     {
