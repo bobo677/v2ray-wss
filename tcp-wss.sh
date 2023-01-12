@@ -10,6 +10,7 @@ fi
 timedatectl set-timezone Asia/Shanghai
 v2path=$(cat /dev/urandom | head -1 | md5sum | head -c 6)
 v2uuid=$(cat /proc/sys/kernel/random/uuid)
+sub=$v2path+"98.txt"
 
 install_precheck(){
     echo "====输入已经DNS解析好的域名===="
@@ -94,6 +95,9 @@ http {
             proxy_set_header Connection "upgrade";
             proxy_set_header Host \$http_host;
         }
+        location /$sub{
+            alias /usr/local/etc/xray/vmess.txt
+            }
     }
 }
 EOF
@@ -107,7 +111,7 @@ acme_ssl(){
 }
 
 install_v2ray(){    
-    # bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
     
 cat >/usr/local/etc/xray/config.json<<EOF
 {
@@ -142,21 +146,30 @@ EOF
     systemctl enable v2ray.service && systemctl restart v2ray.service
     rm -f tcp-wss.sh install-release.sh
 
-cat >/usr/local/etc/v2ray/client.json<<EOF
+cat >/usr/local/etc/xray/client.json<<EOF
 {
-===========配置参数=============
-地址：${domain}
-端口：443/8080
-UUID：${v2uuid}
-加密方式：aes-128-gcm
-传输协议：ws
-路径：/${v2path}
-底层传输：tls
-注意：8080是免流端口不需要打开tls
+	"v": "2",
+	"ps": "${domain}",
+	"add": "${domain}",
+	"port": "443",
+	"id": "${v2uuid}",
+	"aid": "o",
+	"scy": "auto",
+	"net": "ws",
+	"type": "none",
+	"host": "${v2uuid}",
+	"path": "${v2path}?ed=2048",
+	"tls": "tls"
 }
 EOF
 
     clear
+}
+
+sub_vmesslink(){
+    base64 -w 0 /usr/loacl/etc/xray/client.json > vmess.txt
+    sed -i 's/^/vmess:\/\//' vmess.txt
+    systemctl restart nginx.service
 }
 
 install_sslibev(){
@@ -209,6 +222,8 @@ client_v2ray(){
     echo
     echo "安装已经完成"
     echo
+    echo "sub: $https://${domain}/$sub
+    echo
     echo "===========v2ray配置参数============"
     echo "地址：${domain}"
     echo "端口：443/8080"
@@ -258,6 +273,7 @@ start_menu(){
     install_nginx
     acme_ssl
     install_v2ray
+    sub_vmesslink
     client_v2ray
     ;;
     3)
