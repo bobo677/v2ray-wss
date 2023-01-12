@@ -181,15 +181,16 @@ proxies:
     network: ws
     ws-opts:
       path: ${v2path}?ed=2048
-      headers: ${domain}
+      headers: 
+      	Host: ${domain}
 EOF
 
     clear
 }
 
 sub_vmesslink(){
-    base64 -w 0 /usr/loacl/etc/xray/client.json > vmess.txt
-    sed -i 's/^/vmess:\/\//' vmess.txt
+    vmess="vmess://"$(base64 -w 0 /usr/loacl/etc/xray/client.json)
+    echo $vmess | base64 -w 0 > vmess.txt
     systemctl restart nginx.service
 }
 
