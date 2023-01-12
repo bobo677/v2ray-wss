@@ -189,7 +189,7 @@ EOF
 }
 
 sub_vmesslink(){
-    vmess="vmess://"$(base64 -w 0 /usr/loacl/etc/xray/client.json)
+    vmess="vmess://"$(base64 -w 0 /usr/local/etc/xray/client.json)
     echo $vmess | base64 -w 0 > vmess.txt
     systemctl restart nginx.service
 }
