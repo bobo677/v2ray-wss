@@ -222,7 +222,7 @@ client_v2ray(){
     echo
     echo "安装已经完成"
     echo
-    echo "sub: $https://${domain}/$sub
+    echo "sub: https://${domain}/$sub
     echo
     echo "===========v2ray配置参数============"
     echo "地址：${domain}"
@@ -251,11 +251,6 @@ client_sslibev(){
 
 start_menu(){
     clear
-    echo " ================================================== "
-    echo " 论坛：https://1024.day                              "
-    echo " 介绍：一键安装Shadowsocks-libev和v2ray+ws+tls代理    "
-    echo " 系统：Ubuntu、Debian、CentOS                        "
-    echo " ================================================== "
     echo
     echo " 1. 安装Shadowsocks-libev"
     echo " 2. 安装v2ray+ws+tls"
