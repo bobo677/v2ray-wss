@@ -10,7 +10,8 @@ fi
 timedatectl set-timezone Asia/Shanghai
 v2path=$(cat /dev/urandom | head -1 | md5sum | head -c 6)
 v2uuid=$(cat /proc/sys/kernel/random/uuid)
-sub=$v2path+"98.txt"
+sub_vmess=$v2path+"vmess98.txt"
+sub_clash=$v2path+"clash98.txt"
 
 install_precheck(){
     echo "====输入已经DNS解析好的域名===="
@@ -95,9 +96,12 @@ http {
             proxy_set_header Connection "upgrade";
             proxy_set_header Host \$http_host;
         }
-        location /$sub{
+        location /$sub_vmess{
             alias /usr/local/etc/xray/vmess.txt
             }
+	location /$sub_clash{
+	    alias /usr/local/etc/xray/clash.ymal
+	}
     }
 }
 EOF
@@ -162,6 +166,22 @@ cat >/usr/local/etc/xray/client.json<<EOF
 	"tls": "tls"
 }
 EOF
+cat > /usr/local/etc/xray/clash.yaml <<EOF
+proxies:
+  - name: $domain
+    type: vmess
+    server: $domain
+    port: 443
+    uuid: $id
+    alterId: 0
+    cipher: auto
+    tls: true
+    udp: true
+    network: ws
+    ws-opts:
+      path: $path
+      headers: $domain
+EOF
 
     clear
 }
@@ -222,7 +242,8 @@ client_v2ray(){
     echo
     echo "安装已经完成"
     echo
-    echo "sub: https://${domain}/$sub
+    echo "Vmess: https://${domain}/$sub_vmess
+    echo "clash: https://${domain}/$sub_clash
     echo
     echo "===========v2ray配置参数============"
     echo "地址：${domain}"
