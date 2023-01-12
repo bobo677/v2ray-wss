@@ -161,26 +161,27 @@ cat >/usr/local/etc/xray/client.json<<EOF
 	"scy": "auto",
 	"net": "ws",
 	"type": "none",
-	"host": "${v2uuid}",
+	"host": "${domain}",
 	"path": "${v2path}?ed=2048",
 	"tls": "tls"
 }
 EOF
+
 cat > /usr/local/etc/xray/clash.yaml <<EOF
 proxies:
-  - name: $domain
+  - name: ${domain}
     type: vmess
-    server: $domain
+    server: ${domain}
     port: 443
-    uuid: $id
+    uuid: ${v2uuid}
     alterId: 0
     cipher: auto
     tls: true
     udp: true
     network: ws
     ws-opts:
-      path: $path
-      headers: $domain
+      path: ${v2path}?ed=2048
+      headers: ${domain}
 EOF
 
     clear
