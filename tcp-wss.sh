@@ -10,8 +10,8 @@ fi
 timedatectl set-timezone Asia/Shanghai
 v2path=$(cat /dev/urandom | head -1 | md5sum | head -c 6)
 v2uuid=$(cat /proc/sys/kernel/random/uuid)
-sub_vmess=$v2path+"vmess98.txt"
-sub_clash=$v2path+"clash98.txt"
+sub_vmess=$v2path"vmess98"
+sub_clash=$v2path"clash98"
 
 install_precheck(){
     echo "====输入已经DNS解析好的域名===="
@@ -96,11 +96,11 @@ http {
             proxy_set_header Connection "upgrade";
             proxy_set_header Host \$http_host;
         }
-        location /$sub_vmess{
-            alias /usr/local/etc/xray/vmess.txt
+        location /$sub_vmess {
+            alias /usr/local/etc/xray/vmess.txt;
             }
-	location /$sub_clash{
-	    alias /usr/local/etc/xray/clash.ymal
+	location /$sub_clash {
+	    alias /usr/local/etc/xray/clash.ymal;
 	}
     }
 }
