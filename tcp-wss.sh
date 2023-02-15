@@ -1,5 +1,4 @@
 #!/bin/sh
-# forum: https://1024.day
 
 if [[ $EUID -ne 0 ]]; then
     clear
@@ -48,63 +47,114 @@ install_nginx(){
     fi
 
 cat >/etc/nginx/nginx.conf<<EOF
-pid /var/run/nginx.pid;
+user www-data;
 worker_processes auto;
-worker_rlimit_nofile 51200;
+pid /run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+
 events {
-    worker_connections 1024;
-    multi_accept on;
-    use epoll;
+	worker_connections 768;
+	# multi_accept on;
 }
+
 http {
-    server_tokens off;
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 120s;
-    keepalive_requests 10000;
-    types_hash_max_size 2048;
-    include /etc/nginx/mime.types;
-    access_log off;
-    error_log /dev/null;
-    server {
-        listen 80;
-        listen [::]:80;
-        server_name $domain;
-        location / {
-            return 301 https://\$server_name\$request_uri;
-        }
+
+	##
+	# Basic Settings
+	##
+
+	sendfile on;
+	tcp_nopush on;
+	types_hash_max_size 2048;
+	# server_tokens off;
+
+	# server_names_hash_bucket_size 64;
+	# server_name_in_redirect off;
+
+	include /etc/nginx/mime.types;
+	#default_type application/octet-stream;
+	default_type text/plain;
+
+	##
+	# SSL Settings
+	##
+
+	ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3; # Dropping SSLv3, ref: POODLE
+	ssl_prefer_server_ciphers on;
+
+	##
+	# Logging Settings
+	##
+
+	access_log /var/log/nginx/access.log;
+	error_log /var/log/nginx/error.log;
+
+	##
+	# Gzip Settings
+	##
+
+	gzip on;
+
+	# gzip_vary on;
+	# gzip_proxied any;
+	# gzip_comp_level 6;
+	# gzip_buffers 16 8k;
+	# gzip_http_version 1.1;
+	# gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+	##
+	# Virtual Host Configs
+	##
+
+	include /etc/nginx/conf.d/*.conf;
+	include /etc/nginx/sites-enabled/*;
+}
+#mail {
+#	# See sample authentication script at:
+#	# http://wiki.nginx.org/ImapAuthenticateWithApachePhpScript
+#
+#	# auth_http localhost/auth.php;
+#	# pop3_capabilities "TOP" "USER";
+#	# imap_capabilities "IMAP4rev1" "UIDPLUS";
+#
+#	server {
+#		listen     localhost:110;
+#		protocol   pop3;
+#		proxy      on;
+#	}
+#
+#	server {
+#		listen     localhost:143;
+#		protocol   imap;
+#		proxy      on;
+#	}
+#}
+EOF
+
+cat >/etc/nginx/conf.d/$domain.conf<<EOF
+server {
+    listen 80 proxy_protocol;
+    listen [::]:80 proxy_protocol;
+    listen 81 http2 proxy_protocol;
+    server_name $domain;
+    #root /usr/share/nginx/html;
+    location / {
+        proxy_ssl_server_name on;
+        proxy_pass https://www.wallpaperstock.net;
+        proxy_set_header Accept-Encoding '';
+        sub_filter "www.wallpaperstock.net" "gh.emodmge.ml";
+        sub_filter_once off;
     }
-    server {
-        listen 443 ssl http2;
-        listen [::]:443 ssl http2;
-        server_name $domain;
-        ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:HIGH:!aNULL:!MD5:!RC4:!DHE;
-        ssl_prefer_server_ciphers on;
-        ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;        
-        location / {
-            default_type text/plain;
-            return 200 "Hello World !";
-        }        
-        location /$v2path {
-            proxy_redirect off;
-            proxy_pass http://127.0.0.1:8080;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade \$http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_set_header Host \$http_host;
-        }
-        location /$sub_vmess {
-            alias /usr/local/etc/xray/vmess.txt;
-            }
-	location /$sub_clash {
-	    alias /usr/local/etc/xray/clash.ymal;
-	}
+    location /config/sub {
+	    alias /usr/local/etc/xray/vmess.txt;
+
     }
+        location = /robots.txt {}
+
+        
 }
 EOF
+
 }
 
 acme_ssl(){    
@@ -114,40 +164,207 @@ acme_ssl(){
     ~/.acme.sh/acme.sh --issue -d $domain --standalone --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "~/.acme.sh/acme.sh --installcert -d $domain --ecc --fullchain-file /etc/letsencrypt/live/$domain/fullchain.pem --key-file /etc/letsencrypt/live/$domain/privkey.pem --reloadcmd \"systemctl restart nginx\""
 }
 
-install_v2ray(){    
+install_v2ray(){
+        
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
-    
+    cp /etc/letsencrypt/live/$domain/fullchain.pem /usr/local/etc/xray/fullchain.pem
+    cp /etc/letsencrypt/live/$domain/privkey.pem /usr/local/etc/xray/privkey.pem
+
 cat >/usr/local/etc/xray/config.json<<EOF
 {
-  "inbounds": [
-    {
-      "port": 8080,
-      "protocol": "vmess",
-      "settings": {
-        "clients": [
-          {
-            "id": "$v2uuid"
-          }
+    "stats": {},
+    "api": {
+        "tag": "api",
+        "services": [
+            "StatsService"
         ]
-      },
-      "streamSettings": {
-        "network": "ws",
-        "wsSettings": {
-        "path": "/$v2path"
+    },
+    "policy": {
+        "levels": {
+            "0": {
+                "handshake": 4,
+                "connIdle": 300,
+                "uplinkOnly": 2,
+                "downlinkOnly": 5,
+                "statsUserUplink": true,
+                "statsUserDownlink": true,
+                "bufferSize": 4
+            }
+        },
+        "system": {
+            "statsInboundUplink": true,
+            "statsInboundDownlink": true,
+            "statsOutboundUplink": true,
+            "statsOutboundDownlink": true
         }
-      }
+    },
+    "reverse": {
+        "portals": [
+            {
+                "tag": "portal",
+                "domain": "pc4.localhost"
+            }
+        ]
+    },
+    "inbounds": [
+        {
+            "tag": "tunnel",
+            "port": 443,
+            "protocol": "vless",
+            "sniffing": {
+                "enabled": true,
+                "destOverride": [
+                    "http",
+                    "tls",
+                    "quic"
+                ],
+                "metadataOnly": false,
+                "domainsExcluded": [
+                    "emodmge.ml"
+                ]
+            },
+            "settings": {
+                "clients": [
+                    {
+                        "id": "${v2uuid}",
+                        "flow": "xtls-rprx-direct",
+                        "level": 0
+                    }
+                ],
+                "decryption": "none",
+                "fallbacks": [
+                    {
+                        "alpn": "http/1.1",
+                        "dest": 80,
+                        "xver": 1
+                    },
+                    {
+                        "alpn": "h2",
+                        "dest": 81,
+                        "xver": 1
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "xtls",
+                "xtlsSettings": {
+                    "serverName": "${domain}",
+                    "alpn": [
+                        "http/1.1",
+                        "h2"
+                    ],
+                    "certificates": [
+                        {
+                            "certificateFile": "/usr/local/etc/xray/fullchain.pem",
+                            "keyFile": "/usr/local/etc/xray/privkey.pem"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "listen": "127.0.0.1",
+            "port": 10085,
+            "protocol": "dokodemo-door",
+            "settings": {
+                "address": "127.0.0.1"
+            },
+            "tag": "api"
+        }
+    ],
+    "outbounds": [
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {}
+        }
+    ],
+    "routing": {
+        "domainStrategy": "IPIfNonMatch",
+        "domainMatcher": "mph",
+        "rules": [
+            {
+                "inboundTag": [
+                    "api"
+                ],
+                "outboundTag": "api",
+                "type": "field"
+            },
+            {
+                "type": "field",
+                "inboundTag": [
+                    "tunnel"
+                ],
+                "domain": [
+                    "byr.pt",
+                    "geosite:category-anticensorship",
+                    "geosite:google",
+                    "geosite:youtube",
+                    "geosite:telegram",
+                    "geosite:category-media",
+                    "geosite:geolocation-!cn"
+                ],
+                "outboundTag": "direct"
+            },
+            {
+                "type": "field",
+                "inboundTag": [
+                    "interconn"
+                ],
+                "outboundTag": "portal"
+            },
+            {
+                "type": "field",
+                "inboundTag": [
+                    "tunnel"
+                ],
+                "domain": [
+                    "emodmge.ml",
+                    "geosite:bilibili",
+                    "geosite:cn",
+                    "domain:icloud.com",
+                    "domain:icloud-content.com",
+                    "domain:cdn-apple.com",
+                    "geosite:private"
+                ],
+                "outboundTag": "portal"
+            },
+            {
+                "type": "field",
+                "inboundTag": [
+                    "tunnel"
+                ],
+                "ip": [
+                    "geoip:cn"
+                ],
+                "outboundTag": "portal"
+            },
+            {
+                "type": "field",
+                "protocol": [
+                    "bittorrent"
+                ],
+                "outboundTag": "block"
+            },
+            {
+                "type": "field",
+                "domain": [
+                    "geosite:category-ads-all"
+                ],
+                "outboundTag": "block"
+            }
+        ]
     }
-  ],
-  "outbounds": [
-    {
-      "protocol": "freedom",
-      "settings": {}
-    }
-  ]
 }
 EOF
 
-    systemctl enable v2ray.service && systemctl restart v2ray.service
+    systemctl enable xay.service && systemctl restart xray.service
     rm -f tcp-wss.sh install-release.sh
 
 cat >/usr/local/etc/xray/client.json<<EOF
@@ -291,7 +508,6 @@ start_menu(){
     install_nginx
     acme_ssl
     install_v2ray
-    sub_vmesslink
     client_v2ray
     ;;
     3)
